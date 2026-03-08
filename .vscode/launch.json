@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (MSVC)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/program.exe",  // 与 tasks.json 输出一致
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build"                      // 调试前自动编译
+        }
+    ]
+}
