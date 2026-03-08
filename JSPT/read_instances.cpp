@@ -157,7 +157,44 @@ void read_HK_transport(ifstream& fin, yunshutime& yt, int m)
 
 void read_SWV_jobs(ifstream& fin, vector<GONGJIAN>& jobs, int& m)
 {
-    read_HK_jobs(fin, jobs, m);
+    int n;
+
+    fin >> n >> m;
+
+    jobs.resize(n);
+
+    for (int i = 0; i < n; i++)
+    {
+        jobs[i].id = i + 1;
+
+        for (int j = 0; j < m; j++)
+        {
+            int machine, time;
+            fin >> machine >> time;
+
+            GONGXU op;
+
+            op.id = i + 1;
+            op.op_index = j + 1;
+            op.jiqi_id = machine;   // 机器编号从1开始
+            op.jiagong_time = time;
+
+            jobs[i].gongxu_set.push_back(op);
+        }
+    }
+}
+
+void read_SWV_transport(ifstream& fin, yunshutime& yt)
+{
+    int m = 10;
+
+    yt.BU.assign(m, vector<int>(m));
+
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < m; j++)
+            fin >> yt.BU[i][j];
+
+    yt.suanlileibei = "SWV";
 }
 
 
@@ -196,7 +233,7 @@ void read_instances(
     {
         int m;
         read_SWV_jobs(fin, jobs, m);
-        read_HK_transport(fin, yt, m);
+        read_SWV_transport(fin, yt);
     }
 
     fin.close();

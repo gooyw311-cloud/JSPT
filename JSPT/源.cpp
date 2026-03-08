@@ -46,7 +46,7 @@ void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt) {
             cout << "BU transport matrix is empty." << endl;
         }
     }
-    else if (yt.suanlileibei == "HK" || yt.suanlileibei == "SWV") {
+    else if (yt.suanlileibei == "HK") {
         if (!yt.man.empty() && !yt.kong.empty()) {
             int m = (int)yt.man.size();
             cout << "Loaded transport matrix (man)  (" << m << "x" << m << "):" << endl;
@@ -67,16 +67,30 @@ void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt) {
             cout << "Transport matrices are empty." << endl;
         }
     }
+    else if (yt.suanlileibei == "SWV") {
+        // SWV 算例的运输时间存储在 BU 矩阵中
+        if (!yt.BU.empty()) {
+            int m = (int)yt.BU.size();
+            cout << "SWV transport matrix (" << m << "x" << m << "):" << endl;
+            for (int i = 0; i < m; ++i) {
+                for (int j = 0; j < m; ++j) {
+                    cout << yt.BU[i][j] << " ";
+                }
+                cout << endl;
+            }
+        } else {
+            cout << "SWV transport matrix is empty." << endl;
+        }
+    }
     else {
         cout << "Unknown instance type." << endl;
     }
     cout << "============================================" << endl;
 }
-
 int main()
 {
-    vector<GONGJIAN> jobs1,jobs2;
-    yunshutime yt1,yt2;
+    vector<GONGJIAN> jobs1,jobs2,jobs3;
+    yunshutime yt1,yt2,yt3;
 
     read_instances(
         "EX101.txt",
@@ -92,5 +106,11 @@ int main()
     );
     print_instances(jobs2, yt2);
 
+    read_instances(
+        "SWV1.txt",
+        jobs3,
+        yt3
+    );
+    print_instances(jobs3, yt3);
     return 0;
 }
