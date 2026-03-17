@@ -20,7 +20,8 @@ string detect_instance_type(const string& filename)
         return "BU";
 
     if (filename.find("P1") != string::npos ||
-        filename.find("P2") != string::npos)
+        filename.find("P2") != string::npos ||
+        filename.find("HK") != string::npos)
         return "HK";
 
     return "SWV";
@@ -77,13 +78,19 @@ void read_BU_jobs(ifstream& fin, vector<GONGJIAN>& jobs)
 
 void read_BU_transport(ifstream& fin, yunshutime& yt)
 {
-    int m = 4;
+    int m = 5;//针对5台机器的矩阵
+    yt.man.assign(m, vector<int>(m));
+    yt.kong.assign(m, vector<int>(m));
 
-    yt.BU.assign(m, vector<int>(m));
-
+    // 满载运输时间
     for (int i = 0; i < m; i++)
         for (int j = 0; j < m; j++)
-            fin >> yt.BU[i][j];
+            fin >> yt.man[i][j];
+
+    // 空载运输时间
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < m; j++)
+            fin >> yt.kong[i][j];
 
     yt.suanlileibei = "BU";
 }
@@ -186,13 +193,19 @@ void read_SWV_jobs(ifstream& fin, vector<GONGJIAN>& jobs, int& m)
 
 void read_SWV_transport(ifstream& fin, yunshutime& yt)
 {
-    int m = 10;
+    int m = 11;//针对10台机器的矩阵
+yt.man.assign(m, vector<int>(m));
+    yt.kong.assign(m, vector<int>(m));
 
-    yt.BU.assign(m, vector<int>(m));
-
+    // 满载运输时间
     for (int i = 0; i < m; i++)
         for (int j = 0; j < m; j++)
-            fin >> yt.BU[i][j];
+            fin >> yt.man[i][j];
+
+    // 空载运输时间
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < m; j++)
+            fin >> yt.kong[i][j];
 
     yt.suanlileibei = "SWV";
 }
@@ -220,6 +233,7 @@ void read_instances(
 
     if (type == "BU")
     {
+        int m;
         read_BU_jobs(fin, jobs);
         read_BU_transport(fin, yt);
     }

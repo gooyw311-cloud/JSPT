@@ -33,12 +33,19 @@ void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt) {
 
     // 打印运输时间矩阵（根据算例类型）
     if (yt.suanlileibei == "BU") {
-        if (!yt.BU.empty()) {
-            int m = (int)yt.BU.size();
-            cout << "BU transport matrix (" << m << "x" << m << "):" << endl;
+        if (!yt.man.empty() && !yt.kong.empty()) {
+            int m = (int)yt.man.size();
+            cout << "Loaded transport matrix (man)  (" << m << "x" << m << "):" << endl;
             for (int i = 0; i < m; ++i) {
                 for (int j = 0; j < m; ++j) {
-                    cout << yt.BU[i][j] << " ";
+                    cout << yt.man[i][j] << " ";
+                }
+                cout << endl;
+            }
+            cout << "Empty transport matrix (kong) (" << m << "x" << m << "):" << endl;
+            for (int i = 0; i < m; ++i) {
+                for (int j = 0; j < m; ++j) {
+                    cout << yt.kong[i][j] << " ";
                 }
                 cout << endl;
             }
@@ -69,12 +76,19 @@ void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt) {
     }
     else if (yt.suanlileibei == "SWV") {
         // SWV 算例的运输时间存储在 BU 矩阵中
-        if (!yt.BU.empty()) {
-            int m = (int)yt.BU.size();
-            cout << "SWV transport matrix (" << m << "x" << m << "):" << endl;
+        if (!yt.man.empty() && !yt.kong.empty()) {
+            int m = (int)yt.man.size();
+            cout << "Loaded transport matrix (man)  (" << m << "x" << m << "):" << endl;
             for (int i = 0; i < m; ++i) {
                 for (int j = 0; j < m; ++j) {
-                    cout << yt.BU[i][j] << " ";
+                    cout << yt.man[i][j] << " ";
+                }
+                cout << endl;
+            }
+            cout << "Empty transport matrix (kong) (" << m << "x" << m << "):" << endl;
+            for (int i = 0; i < m; ++i) {
+                for (int j = 0; j < m; ++j) {
+                    cout << yt.kong[i][j] << " ";
                 }
                 cout << endl;
             }
@@ -99,6 +113,7 @@ int main()
     );
     print_instances(jobs1, yt1);
     
+
     read_instances(
         "HK1.txt",
         jobs2,
@@ -106,6 +121,7 @@ int main()
     );
     print_instances(jobs2, yt2);
 
+    
     read_instances(
         "SWV1.txt",
         jobs3,
