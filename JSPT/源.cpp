@@ -4,102 +4,111 @@
 #include "GONGJIAN.h"
 #include "yunshutime.h"
 #include "read_instances.h"
-using namespace std;
-
-#include <iostream>
-#include <vector>
-#include <string>
-#include "GONGJIAN.h"
-#include "yunshutime.h"
+#include "random.h"
+#include <map>
 
 using namespace std;
 
-void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt) {
+
+void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt)
+{
     cout << "========== Instance Verification ==========" << endl;
     cout << "Instance type   : " << yt.suanlileibei << endl;
     cout << "Number of jobs  : " << jobs.size() << endl;
     cout << endl;
 
-    // 打印每个工件的工序
-    for (const auto& job : jobs) {
+    /* 打印工件 */
+    for (const auto& job : jobs)
+    {
         cout << "Job " << job.id << " (" << job.gongxu_set.size() << " operations):" << endl;
-        for (const auto& op : job.gongxu_set) {
+
+        for (const auto& op : job.gongxu_set)
+        {
             cout << "   Op " << op.op_index
                  << " -> machine " << op.jiqi_id
                  << ", process time " << op.jiagong_time << endl;
         }
+
         cout << endl;
     }
 
-    // 打印运输时间矩阵（根据算例类型）
-    if (yt.suanlileibei == "BU") {
-        if (!yt.man.empty() && !yt.kong.empty()) {
-            int m = (int)yt.man.size();
-            cout << "Loaded transport matrix (man)  (" << m << "x" << m << "):" << endl;
-            for (int i = 0; i < m; ++i) {
-                for (int j = 0; j < m; ++j) {
-                    cout << yt.man[i][j] << " ";
-                }
-                cout << endl;
-            }
-            cout << "Empty transport matrix (kong) (" << m << "x" << m << "):" << endl;
-            for (int i = 0; i < m; ++i) {
-                for (int j = 0; j < m; ++j) {
-                    cout << yt.kong[i][j] << " ";
-                }
-                cout << endl;
-            }
-        } else {
-            cout << "BU transport matrix is empty." << endl;
+    /* 打印运输矩阵 */
+    if (!yt.man.empty() && !yt.kong.empty())
+    {
+        int m = yt.man.size();
+
+        cout << "Loaded transport matrix (man) (" << m << "x" << m << "):" << endl;
+
+        for (int i = 0; i < m; i++)
+        {
+            for (int j = 0; j < m; j++)
+                cout << yt.man[i][j] << " ";
+            cout << endl;
+        }
+
+        cout << endl;
+
+        cout << "Empty transport matrix (kong) (" << m << "x" << m << "):" << endl;
+
+        for (int i = 0; i < m; i++)
+        {
+            for (int j = 0; j < m; j++)
+                cout << yt.kong[i][j] << " ";
+            cout << endl;
         }
     }
-    else if (yt.suanlileibei == "HK") {
-        if (!yt.man.empty() && !yt.kong.empty()) {
-            int m = (int)yt.man.size();
-            cout << "Loaded transport matrix (man)  (" << m << "x" << m << "):" << endl;
-            for (int i = 0; i < m; ++i) {
-                for (int j = 0; j < m; ++j) {
-                    cout << yt.man[i][j] << " ";
-                }
-                cout << endl;
-            }
-            cout << "Empty transport matrix (kong) (" << m << "x" << m << "):" << endl;
-            for (int i = 0; i < m; ++i) {
-                for (int j = 0; j < m; ++j) {
-                    cout << yt.kong[i][j] << " ";
-                }
-                cout << endl;
-            }
-        } else {
-            cout << "Transport matrices are empty." << endl;
-        }
+    else
+    {
+        cout << "Transport matrix is empty." << endl;
     }
-    else if (yt.suanlileibei == "SWV") {
-        // SWV 算例的运输时间存储在 BU 矩阵中
-        if (!yt.man.empty() && !yt.kong.empty()) {
-            int m = (int)yt.man.size();
-            cout << "Loaded transport matrix (man)  (" << m << "x" << m << "):" << endl;
-            for (int i = 0; i < m; ++i) {
-                for (int j = 0; j < m; ++j) {
-                    cout << yt.man[i][j] << " ";
-                }
-                cout << endl;
-            }
-            cout << "Empty transport matrix (kong) (" << m << "x" << m << "):" << endl;
-            for (int i = 0; i < m; ++i) {
-                for (int j = 0; j < m; ++j) {
-                    cout << yt.kong[i][j] << " ";
-                }
-                cout << endl;
-            }
-        } else {
-            cout << "SWV transport matrix is empty." << endl;
-        }
-    }
-    else {
-        cout << "Unknown instance type." << endl;
-    }
+
     cout << "============================================" << endl;
+}
+
+void print_chromosome(const Chromosome& chro, const std::vector<GONGJIAN>& jobs) {
+    std::cout << "\n========== test1 (4machine, 2vehicle) ==========" << std::endl;
+
+    std::cout << "Layer 1 (Vehicle Assignment):" << std::endl;
+    for (size_t i = 0; i < chro.vehicle_assignment.size(); ++i) {
+        std::cout << "  Job " << (i + 1) << " Transports: ";
+        for (int v : chro.vehicle_assignment[i]) std::cout << "V" << v << " ";
+        std::cout << std::endl;
+    }
+
+    // 辅助计数器，记录每个工件在序列中是第几次出现
+    std::map<int, int> os_counter;
+    std::map<int, int> ts_counter;
+
+    // 验证第二层 (OS) -> 对应 4 台机器
+    std::cout << "Layer 2 (OS) machine:" << std::endl;
+    std::cout << "OS sequence: [ ";
+    for (int id : chro.operation_sequence) std::cout << id << " ";
+    std::cout << "]" << std::endl;
+    
+    std::cout << "logic: ";
+    for (int id : chro.operation_sequence) {
+        int occurrence = os_counter[id]++; // 第几次出现 [cite: 3]
+        // 查找对应的工序和机器 ID
+        int m_id = jobs[id - 1].gongxu_set[occurrence].jiqi_id;
+        std::cout << "J" << id << "O" << (occurrence + 1) << "(M" << m_id << ") -> ";
+    }
+    std::cout << "END" << std::endl;
+
+    // 验证第三层 (TS) -> 对应 2 辆车
+    std::cout << "\nLayer 3 (TS) vehicle:" << std::endl;
+    std::cout << ": [ ";
+    for (int id : chro.transport_sequence) std::cout << id << " ";
+    std::cout << "]" << std::endl;
+
+    std::cout << "logic: ";
+    for (int id : chro.transport_sequence) {
+        int occurrence = ts_counter[id]++; // 第几次出现 
+        // 从第一层获取分配给该次运输的车辆 ID
+        int v_id = chro.vehicle_assignment[id - 1][occurrence];
+        std::cout << "J" << id << "T" << (occurrence + 1) << "(V" << v_id << ") -> ";
+    }
+    std::cout << "END" << std::endl;
+    std::cout << "====================================================" << std::endl;
 }
 int main()
 {
@@ -128,5 +137,21 @@ int main()
         yt3
     );
     print_instances(jobs3, yt3);
+
+    // 假设有 2 辆 AGV 车辆
+    int num_agvsBU = 2;
+    int num_agvsHK = 1;
+    int num_agvsSWV = 5;
+    
+   // 调用函数生成初始染色体
+    Chromosome test_chro = generate_random_chromosome(jobs1, num_agvsBU);
+    Chromosome test_chro2 = generate_random_chromosome(jobs2, num_agvsHK);
+    Chromosome test_chro3 = generate_random_chromosome(jobs3, num_agvsSWV);
+
+    // 打印验证
+    print_chromosome(test_chro, jobs1);
+    print_chromosome(test_chro2, jobs2);
+    print_chromosome(test_chro3, jobs3);
+
     return 0;
 }
