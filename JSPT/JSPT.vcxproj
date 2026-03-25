@@ -123,12 +123,23 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Chromosome.cpp" />
+    <ClCompile Include="random.cpp" />
+    <ClCompile Include="read_instances.cpp" />
     <ClCompile Include="源.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Chromosome.h" />
     <ClInclude Include="GONGJIAN.h" />
     <ClInclude Include="GONGXU.h" />
+    <ClInclude Include="random.h" />
+    <ClInclude Include="read_instances.h" />
     <ClInclude Include="yunshutime.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="EX101.txt" />
+    <Text Include="HK1.txt" />
+    <Text Include="SWV1.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

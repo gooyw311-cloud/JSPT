@@ -18,6 +18,15 @@
     <ClCompile Include="源.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="read_instances.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="random.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Chromosome.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GONGXU.h">
@@ -29,5 +38,25 @@
     <ClInclude Include="yunshutime.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="read_instances.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Chromosome.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="random.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="EX101.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="HK1.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="SWV1.txt">
+      <Filter>资源文件</Filter>
+    </Text>
   </ItemGroup>
 </Project>
