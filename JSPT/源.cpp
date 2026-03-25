@@ -66,7 +66,6 @@ void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt)
 }
 
 void print_chromosome(const Chromosome& chro, const std::vector<GONGJIAN>& jobs) {
-    std::cout << "\n========== test1 (4machine, 2vehicle) ==========" << std::endl;
 
     std::cout << "Layer 1 (Vehicle Assignment):" << std::endl;
     for (size_t i = 0; i < chro.vehicle_assignment.size(); ++i) {
