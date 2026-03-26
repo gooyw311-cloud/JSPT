@@ -3,6 +3,7 @@
 #include"random.h"
 #include"GONGXU.h"
 #include<map>
+#include<iostream>
 Chromosome::Chromosome() 
 {
 	fitness = 0;
@@ -84,9 +85,10 @@ void Chromosome::calculate(const yunshutime& yt,const std::vector<GONGJIAN>& job
 	{
 		int d = op_counter[id]++;
 		int j = id - 1;
-		if (trans_done[j] < d)
+		while (trans_done[j] <=d)
 		{
-			this->schedule_transport(id, d, jobs, yt, vehicle_free, vehicle_pos, trans_done);
+			int td = trans_done[j];
+			this->schedule_transport(id, td, jobs, yt, vehicle_free, vehicle_pos, trans_done);
 		}
 		int machine_id = jobs[j].gongxu_set[d].jiqi_id;
 		int process_time = jobs[j].gongxu_set[d].jiagong_time;
@@ -101,9 +103,10 @@ void Chromosome::calculate(const yunshutime& yt,const std::vector<GONGJIAN>& job
 	for (int i = 0; i < num_jobs; ++i)
 	{
 		int n_ops_job = (int)jobs[i].gongxu_set.size();
-		if (trans_done[i] <= n_ops_job)
+		while (trans_done[i] <= n_ops_job)
 		{
-			this->schedule_transport(i + 1, n_ops_job, jobs, yt, vehicle_free, vehicle_pos, trans_done);
+			int td = trans_done[i];
+			this->schedule_transport(i + 1,td, jobs, yt, vehicle_free, vehicle_pos, trans_done);
 		}
 	}
 	int makespan = 0;
@@ -113,4 +116,17 @@ void Chromosome::calculate(const yunshutime& yt,const std::vector<GONGJIAN>& job
 		makespan = std::max(makespan,trans_end[i][n_ops_job]);
 	}
 	fitness = makespan;
+}
+void Chromosome::print() const 
+{
+	for (int j = 0; j < op_end.size(); j++) {
+		for (int k = 0; k < op_end[j].size(); k++) {
+			printf("工件%d 工序%d 结束时间：%d\n", j + 1, k + 1, op_end[j][k]);
+		}
+	}
+	for (int j = 0; j <trans_end.size(); j++) {
+		for (int k = 0; k < trans_end[j].size(); k++) {
+			printf("工件%d 运输%d 结束时间：%d\n", j + 1, k, trans_end[j][k]);
+		}
+	}
 }

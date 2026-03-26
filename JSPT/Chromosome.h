@@ -5,8 +5,8 @@
 class Chromosome {
 public:
 
-	Chromosome(){}
-	~Chromosome() {}
+    Chromosome();
+    ~Chromosome();
 	Chromosome(const Chromosome& other);
 	Chromosome& operator=(const Chromosome& other);
     int fitness = 0;
@@ -28,6 +28,6 @@ public:
         std::vector<int>& vehicle_pos,
         std::vector<int>& trans_done
     );
-    void calculate(const yunshutime& yt, const std::vector<GONGJIAN>& jobs) {}
-    
+    void calculate(const yunshutime& yt, const std::vector<GONGJIAN>& jobs);
+	void print() const;
 };

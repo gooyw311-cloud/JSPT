@@ -144,13 +144,18 @@ int main()
     
    // 调用函数生成初始染色体
     Chromosome test_chro = generate_random_chromosome(jobs1, num_agvsBU);
-    Chromosome test_chro2 = generate_random_chromosome(jobs2, num_agvsHK);
-    Chromosome test_chro3 = generate_random_chromosome(jobs3, num_agvsSWV);
-
-    // 打印验证
     print_chromosome(test_chro, jobs1);
+	test_chro.calculate(yt1, jobs1); // 计算适应度
+	test_chro.print(); // 打印染色体信息
+	cout << "tiaoshi" << endl;
+    Chromosome test_chro2 = generate_random_chromosome(jobs2, num_agvsHK);
     print_chromosome(test_chro2, jobs2);
+	test_chro2.calculate(yt2, jobs2); // 计算适应度
+	test_chro2.print(); // 打印染色体信息
+    Chromosome test_chro3 = generate_random_chromosome(jobs3, num_agvsSWV);
     print_chromosome(test_chro3, jobs3);
+	test_chro3.calculate(yt3, jobs3); // 计算适应度
+	test_chro3.print(); // 打印染色体信息
 
     return 0;
 }
