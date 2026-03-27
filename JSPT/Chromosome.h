@@ -20,6 +20,10 @@ public:
     std::vector<int> transport_sequence;
     std::vector<std::vector<int>>op_end;
     std::vector<std::vector<int>>trans_end;
+    std::vector<std::vector<int>>op_start;
+    std::vector<std::vector<int>>trans_start;
+    std::vector<std::vector<int>>empty_start;
+    std::vector<std::vector<int>>empty_end;
     void schedule_transport(
         int job_id, int d,
         const std::vector<GONGJIAN>& jobs,
@@ -30,4 +34,6 @@ public:
     );
     void calculate(const yunshutime& yt, const std::vector<GONGJIAN>& jobs);
 	void print() const;
+    void generate_gantt(const std::vector<GONGJIAN>& jobs, const yunshutime& yt,const char* filename) const;
+
 };

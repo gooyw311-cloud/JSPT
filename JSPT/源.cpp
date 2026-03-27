@@ -147,6 +147,7 @@ int main()
     print_chromosome(test_chro, jobs1);
 	test_chro.calculate(yt1, jobs1); // 计算适应度
 	test_chro.print(); // 打印染色体信息
+	test_chro.generate_gantt(jobs1,yt1, "gantt_chart.txt"); // 生成甘特图
 	cout << "tiaoshi" << endl;
     Chromosome test_chro2 = generate_random_chromosome(jobs2, num_agvsHK);
     print_chromosome(test_chro2, jobs2);
