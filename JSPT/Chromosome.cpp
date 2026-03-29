@@ -1,229 +1,490 @@
-#include"Chromosome.h"
-#include"yunshutime.h"
-#include"random.h"
-#include"GONGXU.h"
-#include<map>
-#include<iostream>
-Chromosome::Chromosome() 
+Ôªø#include "Chromosome.h"
+#include "yunshutime.h"
+#include "random.h"
+#include "GONGXU.h"
+#include <map>
+#include <iostream>
+#include <cstdio>
+#include <algorithm>
+#include <string>
+
+// ============================================================
+//  Constructors / destructor / copy
+// ============================================================
+
+Chromosome::Chromosome()
 {
-	fitness = 0;
-	vehicle_assignment.clear();
-	operation_sequence.clear();
-	transport_sequence.clear();
+    fitness = 0;
+    vehicle_assignment.clear();
+    operation_sequence.clear();
+    transport_sequence.clear();
+    op_start.clear();
+    op_end.clear();
+    trans_start.clear();
+    trans_end.clear();
+    empty_start.clear();
+    empty_end.clear();
 }
-Chromosome::~Chromosome() 
+
+Chromosome::~Chromosome()
 {
-	vehicle_assignment.clear();
-	operation_sequence.clear();
-	transport_sequence.clear();
+    vehicle_assignment.clear();
+    operation_sequence.clear();
+    transport_sequence.clear();
 }
-Chromosome::Chromosome(const Chromosome& other) 
+
+Chromosome::Chromosome(const Chromosome& other)
 {
-	fitness = other.fitness;
-	vehicle_assignment = other.vehicle_assignment;
-	operation_sequence = other.operation_sequence;
-	transport_sequence = other.transport_sequence;
+    fitness = other.fitness;
+    vehicle_assignment = other.vehicle_assignment;
+    operation_sequence = other.operation_sequence;
+    transport_sequence = other.transport_sequence;
+    op_start = other.op_start;
+    op_end = other.op_end;
+    trans_start = other.trans_start;
+    trans_end = other.trans_end;
+    empty_start = other.empty_start;
+    empty_end = other.empty_end;
 }
-Chromosome& Chromosome::operator=(const Chromosome& other) 
+
+Chromosome& Chromosome::operator=(const Chromosome& other)
 {
-	if (this != &other) {
-		fitness = other.fitness;
-		vehicle_assignment = other.vehicle_assignment;
-		operation_sequence = other.operation_sequence;
-		transport_sequence = other.transport_sequence;
-	}
-	return *this;
+    if (this != &other) {
+        fitness = other.fitness;
+        vehicle_assignment = other.vehicle_assignment;
+        operation_sequence = other.operation_sequence;
+        transport_sequence = other.transport_sequence;
+        op_start = other.op_start;
+        op_end = other.op_end;
+        trans_start = other.trans_start;
+        trans_end = other.trans_end;
+        empty_start = other.empty_start;
+        empty_end = other.empty_end;
+    }
+    return *this;
 }
+
+// ============================================================
+//  schedule_transport
+//
+//  Schedules ONE transport event (index d) for job job_id.
+//
+//  BU/SWV mode (is_hk == false):
+//    d = 0          : LU  ‚Üí machine[0]
+//    d = 1..n_ops-1 : machine[d-1] ‚Üí machine[d]
+//    d = n_ops      : machine[n_ops-1] ‚Üí LU   (return trip)
+//    loaded time    : yt.man[from_loc][to_loc]
+//
+//  HK mode (is_hk == true):
+//    d = 0          : virtual depot (0) ‚Üí machine[0]
+//                     man_hk[j][0] == 0  ‚Üí  zero cost, free positioning
+//    d = 1..n_ops-1 : machine[d-1] ‚Üí machine[d]
+//    d = n_ops      : does NOT exist in HK (no return trip)
+//    loaded time    : yt.man_hk[j][d]
+//    empty  time    : yt.kong[vehicle_pos][from_loc]
+//                     (kong padded with 0s at row/col 0 ‚Üí depot costs nothing)
+// ============================================================
 void Chromosome::schedule_transport(
-	int job_id, int d,
-	const std::vector<GONGJIAN>& jobs,
-	const yunshutime& yt,
-	std::vector<int>& vehicle_free,
-	std::vector<int>& vehicle_pos,
-	std::vector<int>& trans_done)
+    int job_id,
+    int d,
+    const std::vector<GONGJIAN>& jobs,
+    const yunshutime& yt,
+    std::vector<int>& vehicle_free,
+    std::vector<int>& vehicle_pos,
+    std::vector<int>& trans_done,
+    bool is_hk)
 {
-	int j = job_id - 1;
-	int n_ops = (int)jobs[j].gongxu_set.size();
-	int v_id = vehicle_assignment[j][d];
-	int from_loc = (d == 0) ? 0 : jobs[j].gongxu_set[d - 1].jiqi_id;
-	int to_loc = (d == n_ops) ? 0 : jobs[j].gongxu_set[d].jiqi_id;
-	int t_empty_start = vehicle_free[v_id];
-	int t_vehicle_arrive = vehicle_free[v_id] + yt.kong[vehicle_pos[v_id]][from_loc];
-	int t_ready = (d == 0) ? 0 : op_end[j][d - 1];
-	int t_start = std::max(t_vehicle_arrive, t_ready);
-	int t_delivery = t_start + yt.man[from_loc][to_loc];
-	empty_start[j][d] = t_empty_start;
-	empty_end[j][d] = t_vehicle_arrive;
-	trans_start[j][d] = t_start;
-	trans_end[j][d] = t_delivery;
-	vehicle_free[v_id] = t_delivery;
-	vehicle_pos[v_id] = to_loc;
-	trans_done[j]++;
+    int j = job_id - 1;
+    int n_ops = (int)jobs[j].gongxu_set.size();
+
+    if (d >= (int)vehicle_assignment[j].size()) return;
+    int v_id = vehicle_assignment[j][d];
+    if (v_id < 1 || v_id >= (int)vehicle_free.size()) return;
+
+    // --- Pickup and delivery locations ---
+    // from_loc : where the job currently sits (vehicle drives here empty)
+    // to_loc   : where the job needs to go next
+    //
+    // BU/SWV: location 0 = LU (physical loading/unloading area)
+    // HK    : location 0 = virtual depot (0-cost padding; no physical LU)
+    int from_loc = (d == 0) ? 0 : jobs[j].gongxu_set[d - 1].jiqi_id;
+    int to_loc = (d == n_ops) ? 0 : jobs[j].gongxu_set[d].jiqi_id;
+
+    // --- Empty travel: vehicle repositions to pickup ---
+    int t_empty_start = vehicle_free[v_id];
+    int t_vehicle_arrive = t_empty_start + yt.kong[vehicle_pos[v_id]][from_loc];
+
+    // --- Loaded travel: vehicle carries job to next location ---
+    int loaded_time;
+    if (is_hk)
+    {
+        // Per-(job, operation) travel time; d must be in [0, n_ops-1]
+        loaded_time = (d < (int)yt.man_hk[j].size()) ? yt.man_hk[j][d] : 0;
+    }
+    else
+    {
+        // Location-to-location matrix
+        loaded_time = yt.man[from_loc][to_loc];
+    }
+
+    int t_job_ready = (d == 0) ? 0 : op_end[j][d - 1];
+    int t_trans_start = std::max(t_vehicle_arrive, t_job_ready);
+    int t_trans_end = t_trans_start + loaded_time;
+
+    // --- Record times ---
+    empty_start[j][d] = t_empty_start;
+    empty_end[j][d] = t_vehicle_arrive;
+    trans_start[j][d] = t_trans_start;
+    trans_end[j][d] = t_trans_end;
+
+    // --- Advance vehicle state ---
+    vehicle_free[v_id] = t_trans_end;
+    vehicle_pos[v_id] = to_loc;
+    trans_done[j]++;
 }
-void Chromosome::calculate(const yunshutime& yt,const std::vector<GONGJIAN>& jobs) 
+
+// ============================================================
+//  calculate
+//
+//  Decodes the chromosome and computes the schedule.
+//
+//  OS structure per job:
+//    BU/SWV : job id appears (n_ops + 1) times
+//             ‚Äî n_ops production ops  +  1 return-to-LU transport
+//    HK     : job id appears n_ops times
+//             ‚Äî n_ops production ops, NO return trip
+//
+//  Fitness:
+//    BU/SWV : max over all jobs of trans_end[j][n_ops]  (back at LU)
+//    HK     : max over all jobs of op_end[j][n_ops-1]   (last op done)
+// ============================================================
+void Chromosome::calculate(
+    const yunshutime& yt,
+    const std::vector<GONGJIAN>& jobs)
 {
-	int time = 0;
-	int num_jobs = (int)jobs.size();
-	int num_vehicles = 0;
-	for (const auto& va : vehicle_assignment) {
-		for (int v : va) {
-			if (v > num_vehicles) num_vehicles = v;
-		}
-	}
-	std::vector<int>vehicle_free(num_vehicles + 1, 0); // ≥µ¡æø’œ– ±º‰
-	std::vector<int>vehicle_pos(num_vehicles + 1, 0); // ≥µ¡æµ±«∞Œª÷√
-	int num_locs = (int)yt.man.size();
-	std::vector<int>machine_free(num_locs, 0); // ª˙∆˜ø’œ– ±º‰
-	op_end.resize(num_jobs);
-	trans_end.resize(num_jobs);
-	op_start.resize(num_jobs);
-	trans_start.resize(num_jobs);
-	empty_start.resize(num_jobs);
-	empty_end.resize(num_jobs);
-	for (int i = 0; i < num_jobs; ++i)
-	{
-		int n_ops_job = (int)jobs[i].gongxu_set.size();
-		op_end[i].resize(n_ops_job, 0);
-		trans_end[i].resize(n_ops_job + 1, 0);
-		op_start[i].resize(n_ops_job, 0);
-		trans_start[i].resize(n_ops_job + 1, 0);
-		empty_start[i].resize(n_ops_job + 1, 0);
-		empty_end[i].resize(n_ops_job + 1, 0);
-	}
-	std::vector<int>op_done(num_jobs, 0); // º«¬º√ø∏ˆπ§º˛µ±«∞Ω¯––µΩµ⁄º∏µ¿π§–Ú
-	std::vector<int>trans_done(num_jobs, 0); // º«¬º√ø∏ˆπ§º˛µ±«∞Ω¯––µΩµ⁄º∏¥Œ‘À ‰
-	std::map<int, int>op_counter; 
-	for (int id : operation_sequence)
-	{
-		int d = op_counter[id]++;
-		int j = id - 1;
-		while (trans_done[j] <=d)
-		{
-			int td = trans_done[j];
-			this->schedule_transport(id, td, jobs, yt, vehicle_free, vehicle_pos, trans_done);
-		}
-		int machine_id = jobs[j].gongxu_set[d].jiqi_id;
-		int process_time = jobs[j].gongxu_set[d].jiagong_time;
-		int t_arrive = trans_end[j][d];
-		int t_ready = (d == 0) ? 0 : op_end[j][d - 1];
-		int t_start = std::max({ t_arrive, t_ready, machine_free[machine_id] });
-		int t_finish = t_start + process_time;
-		op_start[j][d] = t_start;
-		op_end[j][d] = t_finish;
-		machine_free[machine_id] = t_finish;
-		op_done[j]++;
-	}
-	for (int i = 0; i < num_jobs; ++i)
-	{
-		int n_ops_job = (int)jobs[i].gongxu_set.size();
-		while (trans_done[i] <= n_ops_job)
-		{
-			int td = trans_done[i];
-			this->schedule_transport(i + 1,td, jobs, yt, vehicle_free, vehicle_pos, trans_done);
-		}
-	}
-	int makespan = 0;
-	for (int i = 0; i < num_jobs; ++i)
-	{
-		int n_ops_job = (int)jobs[i].gongxu_set.size();
-		makespan = std::max(makespan,trans_end[i][n_ops_job]);
-	}
-	fitness = makespan;
+    bool is_hk = (yt.suanlileibei == "HK");
+    int num_jobs = (int)jobs.size();
+    if (num_jobs == 0) { fitness = 0; return; }
+
+    // Determine number of vehicles from chromosome
+    int num_vehicles = 1;
+    for (const auto& va : vehicle_assignment)
+        for (int v : va)
+            if (v > num_vehicles) num_vehicles = v;
+
+    std::vector<int> vehicle_free(num_vehicles + 1, 0);
+    std::vector<int> vehicle_pos(num_vehicles + 1, 0);
+    int num_locs = (int)yt.kong.size();          // works for both modes
+    std::vector<int> machine_free(num_locs, 0);
+
+    // --- Allocate time arrays ---
+    op_end.assign(num_jobs, {});
+    trans_end.assign(num_jobs, {});
+    op_start.assign(num_jobs, {});
+    trans_start.assign(num_jobs, {});
+    empty_start.assign(num_jobs, {});
+    empty_end.assign(num_jobs, {});
+
+    for (int i = 0; i < num_jobs; ++i)
+    {
+        int n_ops = (int)jobs[i].gongxu_set.size();
+        op_end[i].assign(n_ops, 0);
+        op_start[i].assign(n_ops, 0);
+
+        // HK: n_ops transport slots (d = 0..n_ops-1)
+        // BU/SWV: n_ops+1 transport slots (d = 0..n_ops, including return)
+        int n_trans = is_hk ? n_ops : n_ops + 1;
+        trans_end[i].assign(n_trans, 0);
+        trans_start[i].assign(n_trans, 0);
+        empty_start[i].assign(n_trans, 0);
+        empty_end[i].assign(n_trans, 0);
+    }
+
+    std::vector<int> trans_done(num_jobs, 0);
+    std::map<int, int> op_counter;
+
+    // --- Main decode loop ---
+    for (int id : operation_sequence)
+    {
+        int j = id - 1;
+        if (j < 0 || j >= num_jobs) continue;
+
+        int d = op_counter[id]++;
+        int n_ops = (int)jobs[j].gongxu_set.size();
+
+        if (d < n_ops)
+        {
+            // ---- Production operation d ----
+            // 1. Schedule the transport that brings job to this machine
+            schedule_transport(id, d, jobs, yt,
+                vehicle_free, vehicle_pos, trans_done, is_hk);
+
+            // 2. Schedule the machining operation
+            int machine_id = jobs[j].gongxu_set[d].jiqi_id;
+            int process_time = jobs[j].gongxu_set[d].jiagong_time;
+            if (machine_id < 0 || machine_id >= num_locs) continue;
+
+            int t_start = std::max({
+                trans_end[j][d],
+                (d == 0 ? 0 : op_end[j][d - 1]),
+                machine_free[machine_id]
+                });
+            int t_finish = t_start + process_time;
+
+            op_start[j][d] = t_start;
+            op_end[j][d] = t_finish;
+            machine_free[machine_id] = t_finish;
+        }
+        else if (d == n_ops && !is_hk)
+        {
+            // ---- BU/SWV only: return-to-LU transport ----
+            schedule_transport(id, d, jobs, yt,
+                vehicle_free, vehicle_pos, trans_done, false);
+        }
+        // HK: d == n_ops is never reached (OS has only n_ops entries per job)
+    }
+
+    // --- Compute fitness ---
+    int result = 0;
+    for (int i = 0; i < num_jobs; ++i)
+    {
+        int n_ops = (int)jobs[i].gongxu_set.size();
+        if (is_hk)
+            result = std::max(result, op_end[i][n_ops - 1]);   // last op done
+        else
+            result = std::max(result, trans_end[i][n_ops]);    // back at LU
+    }
+    fitness = result;
 }
-void Chromosome::print() const 
+
+// ============================================================
+//  print
+// ============================================================
+void Chromosome::print(
+    const std::vector<GONGJIAN>& jobs,
+    const yunshutime& yt) const
 {
-	for (int j = 0; j < op_end.size(); j++) {
-		for (int k = 0; k < op_end[j].size(); k++) {
-			printf("π§º˛%d π§–Ú%d Ω· ¯ ±º‰£∫%d\n", j + 1, k + 1, op_end[j][k]);
-		}
-	}
-	for (int j = 0; j <trans_end.size(); j++) {
-		for (int k = 0; k < trans_end[j].size(); k++) {
-			printf("π§º˛%d ‘À ‰%d Ω· ¯ ±º‰£∫%d\n", j + 1, k, trans_end[j][k]);
-		}
-	}
+    if (op_end.empty() || trans_end.empty()) {
+        std::cout << "Êú™ÊâßË°åË∞ÉÂ∫¶ËÆ°ÁÆóÔºÅ" << std::endl;
+        return;
+    }
+
+    bool is_hk = (yt.suanlileibei == "HK");
+
+    // ‚îÄ‚îÄ 1. Â∑•Â∫è / ËøêËæìÁªìÊùüÊó∂Èó¥ÔºàÂéüÊúâËæìÂá∫Ôºâ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+    for (size_t j = 0; j < op_end.size(); ++j)
+        for (size_t k = 0; k < op_end[j].size(); ++k)
+            printf("Â∑•‰ª∂%d Â∑•Â∫è%d ÁªìÊùüÊó∂Èó¥Ôºö%d\n",
+                (int)(j + 1), (int)(k + 1), op_end[j][k]);
+
+    for (size_t j = 0; j < trans_end.size(); ++j)
+        for (size_t k = 0; k < trans_end[j].size(); ++k)
+            printf("Â∑•‰ª∂%d ËøêËæì%d ÁªìÊùüÊó∂Èó¥Ôºö%d\n",
+                (int)(j + 1), (int)(k), trans_end[j][k]);
+
+    // ‚îÄ‚îÄ 2. ÊØèËæÜÂ∞èËΩ¶ÁöÑËøêËæìÁîòÁâπÔºàÊåâÊó∂Èó¥È°∫Â∫èÔºâ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+    struct Event {
+        int  time_start;  // ‰∫ã‰ª∂ÂºÄÂßãÊó∂Âàª
+        int  time_end;    // ‰∫ã‰ª∂ÁªìÊùüÊó∂Âàª
+        int  from_loc;    // Ëµ∑ÁÇπÔºà0 = LU/ËôöÊãüdepotÔºå1..m = Êú∫Â∫äÔºå-1 = ‰∏ä‰∏ÄÂÅúÁïôÂ§ÑÔºâ
+        int  to_loc;      // ÁªàÁÇπ
+        int  job_id;      // 0 = Á©∫ËΩΩÔºå>0 = ËøêËæìËØ•Â∑•‰ª∂
+        int  seg;         // Á¨¨Âá†ÊÆµËøêËæìÔºàdÔºå0-basedÔºâ
+    };
+
+    std::map<int, std::vector<Event>> vehicle_events;
+
+    for (int j = 0; j < (int)jobs.size(); ++j)
+    {
+        if (j >= (int)vehicle_assignment.size()) continue;
+        int n_ops = (int)jobs[j].gongxu_set.size();
+        int n_trans = is_hk ? n_ops : n_ops + 1;
+
+        for (int d = 0; d < n_trans; ++d)
+        {
+            if (d >= (int)vehicle_assignment[j].size()) continue;
+            int v = vehicle_assignment[j][d];
+
+            // Ëµ∑ÁÇπ = ‰∏ä‰∏ÄÂ∑•Â∫èÊâÄÂú®Êú∫Â∫äÔºàd==0 Êó∂‰∏∫ LU / ËôöÊãüdepotÔºåÂç≥ 0Ôºâ
+            int from_loc = (d == 0) ? 0 : jobs[j].gongxu_set[d - 1].jiqi_id;
+            // ÁªàÁÇπ = ÂΩìÂâçÂ∑•Â∫èÊâÄÂú®Êú∫Â∫äÔºàËøîÂõû LU Êó∂‰∏∫ 0Ôºâ
+            int to_loc = (d == n_ops) ? 0 : jobs[j].gongxu_set[d].jiqi_id;
+
+            // Á©∫ËΩΩÊÆµÔºövehicle ‰ªé‰∏ä‰∏ÄÂÅúÁïôÂ§Ñ ‚Üí from_locÔºàpickup ÁÇπÔºâ
+            // Áî® from_loc ‰Ωú‰∏∫ÁªàÁÇπÔºõËµ∑ÁÇπÊ†á -1 Ë°®Á§∫"Áî±‰∏ä‰∏Ä‰ªªÂä°ÁªàÁÇπÂá∫Âèë"ÔºàÂä®ÊÄÅÔºåÊâìÂç∞Êó∂Ê†á"‚Äî"Ôºâ
+            int es = empty_start[j][d], ee = empty_end[j][d];
+            if (ee > es)
+                vehicle_events[v].push_back({ es, ee, /*from*/-1, /*to*/from_loc, /*job*/0, d });
+
+            // Êª°ËΩΩÊÆµÔºöfrom_loc ‚Üí to_loc
+            int ts = trans_start[j][d], te = trans_end[j][d];
+            if (te > ts)
+                vehicle_events[v].push_back({ ts, te, from_loc, to_loc, j + 1, d });
+        }
+    }
+
+    // ËæÖÂä©ÔºöÊää‰ΩçÁΩÆÁºñÂè∑ËΩ¨ÊàêÂèØËØªÂ≠óÁ¨¶‰∏≤
+    auto loc_name = [&](int loc) -> std::string {
+        if (loc == -1) return "‚Äî";
+        if (loc == 0) return is_hk ? "depot" : "LU";
+        char buf[16];
+        sprintf_s(buf, "M%d", loc);
+        return buf;
+        };
+
+    printf("\n========== Â∞èËΩ¶ËøêËæìÁîòÁâπ ==========\n");
+
+    for (auto& kv : vehicle_events)
+    {
+        int v = kv.first;
+        auto& evs = kv.second;
+
+        // ÊåâÂºÄÂßãÊó∂ÂàªÊéíÂ∫è
+        std::sort(evs.begin(), evs.end(),
+            [](const Event& a, const Event& b) { return a.time_start < b.time_start; });
+
+        printf("\n„ÄêËΩ¶ËæÜ %d„Äë\n", v);
+        printf("  %-6s  %-7s  %-7s  %-6s  %-6s  ËØ¥Êòé\n",
+            "Á±ªÂûã", "Ëµ∑ÁÇπ", "ÁªàÁÇπ", "ÂºÄÂßã", "ÁªìÊùü");
+        printf("  %s\n", std::string(52, '-').c_str());
+
+        for (const auto& e : evs)
+        {
+            if (e.job_id == 0)
+            {
+                printf("  %-6s  %-7s  %-7s  %-6d  %-6d  Á©∫ËΩΩÁßªÂä®\n",
+                    "Á©∫ËΩΩ",
+                    loc_name(e.from_loc).c_str(),
+                    loc_name(e.to_loc).c_str(),
+                    e.time_start, e.time_end);
+            }
+            else
+            {
+                printf("  %-6s  %-7s  %-7s  %-6d  %-6d  ËøêËæì Â∑•‰ª∂%d Á¨¨%dÊÆµ\n",
+                    "ËøêËæì",
+                    loc_name(e.from_loc).c_str(),
+                    loc_name(e.to_loc).c_str(),
+                    e.time_start, e.time_end,
+                    e.job_id, e.seg + 1);
+            }
+        }
+    }
+
+    printf("\n===================================\n");
 }
-void Chromosome::generate_gantt(const std::vector<GONGJIAN>& jobs, const yunshutime& yt, const char* filename) const
+
+// ============================================================
+//  generate_gantt
+// ============================================================
+void Chromosome::generate_gantt(
+    const std::vector<GONGJIAN>& jobs,
+    const yunshutime& yt,
+    const char* filename) const
 {
-	FILE* f = nullptr;
-	if (fopen_s(&f, filename, "wb") != 0 || !f) return;
-	unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
-	fwrite(bom, 1, 3, f);
+    bool is_hk = (yt.suanlileibei == "HK");
 
-	struct Task { int start, end, job; std::string label, type; };
-	std::map<int, std::vector<Task>> vehicle_tasks;
-	std::map<int, std::vector<Task>> machine_tasks;
+    FILE* f = nullptr;
+    if (fopen_s(&f, filename, "wb") != 0 || !f) {
+        std::cerr << "ÁîòÁâπÂõæÊñá‰ª∂ÂàõÂª∫Â§±Ë¥•ÔºÅ" << std::endl;
+        return;
+    }
+    unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+    fwrite(bom, 1, 3, f);
 
-	for (int j = 0; j < (int)jobs.size(); j++) {
-		for (int k = 0; k < (int)trans_end[j].size(); k++) {
-			int v_id = vehicle_assignment[j][k];
-			int from_loc = (k == 0) ? 0 : jobs[j].gongxu_set[k - 1].jiqi_id;
-			int to_loc = (k == (int)jobs[j].gongxu_set.size()) ? 0 : jobs[j].gongxu_set[k].jiqi_id;
+    struct Task { int start, end, job; std::string label, type; };
+    std::map<int, std::vector<Task>> vehicle_tasks;
+    std::map<int, std::vector<Task>> machine_tasks;
 
-			// ø’‘ÿ∂Œ£∫÷±Ω””√ empty_start/empty_end
-			int es = empty_start[j][k];
-			int ee = empty_end[j][k];
-			if (ee > es) {
-				char buf[128];
-				// ø’‘ÿ∆µ„∫Õ÷’µ„£∫–°≥µ¥” from_loc ≥ˆ∑¢µƒ…œ“ª∏ˆŒª÷√Œ“√«÷ª”– from_loc£¨
-				// ø’‘ÿ÷’µ„æÕ « from_loc
-				// µ´Œ“√«≤ª÷™µ¿ø’‘ÿ∆µ„ «ƒƒ∏ˆª˙∆˜£¨÷ªƒ‹º«¬º"«∞Õ˘ from_loc"
-				if (from_loc == 0) sprintf_s(buf, "ø’‘ÿ°˙LU");
-				else sprintf_s(buf, "ø’‘ÿ°˙M%d", from_loc);
-				vehicle_tasks[v_id].push_back({ es, ee, 0, buf, "empty" });
-			}
+    for (int j = 0; j < (int)jobs.size(); j++)
+    {
+        if (j >= (int)vehicle_assignment.size()) continue;
+        int n_ops = (int)jobs[j].gongxu_set.size();
+        // Number of transport slots: n_ops for HK, n_ops+1 for BU/SWV
+        int n_trans = is_hk ? n_ops : n_ops + 1;
 
-			// ¬˙‘ÿ∂Œ
-			int ts = trans_start[j][k];
-			int te = trans_end[j][k];
-			if (te > ts) {
-				char buf[128];
-				if (from_loc == 0) sprintf_s(buf, "J%d: LU°˙M%d", j + 1, to_loc);
-				else if (to_loc == 0) sprintf_s(buf, "J%d: M%d°˙LU", j + 1, from_loc);
-				else sprintf_s(buf, "J%d: M%d°˙M%d", j + 1, from_loc, to_loc);
-				vehicle_tasks[v_id].push_back({ ts, te, j + 1, buf, "load" });
-			}
+        for (int k = 0; k < n_trans; k++)
+        {
+            if (k >= (int)vehicle_assignment[j].size()) continue;
+            int v_id = vehicle_assignment[j][k];
+            if (v_id < 1) continue;
 
-			// ª˙∆˜º”π§∂Œ
-			if (k < (int)op_end[j].size()) {
-				int m_id = jobs[j].gongxu_set[k].jiqi_id;
-				char buf[64];
-				sprintf_s(buf, "J%d-O%d", j + 1, k + 1);
-				machine_tasks[m_id].push_back({ op_start[j][k], op_end[j][k], j + 1, buf, "op" });
-			}
-		}
-	}
+            int from_loc = (k == 0) ? 0 : jobs[j].gongxu_set[k - 1].jiqi_id;
+            int to_loc = (k == n_ops) ? 0 : jobs[j].gongxu_set[k].jiqi_id;
 
-	fprintf(f, "<!DOCTYPE html><html><head><meta charset='utf-8'><title>∏ ÃÿÕº</title><style>");
-	fprintf(f, "body{font-family:Arial;margin:20px}.row{height:40px;position:relative;border-bottom:1px solid #ddd}");
-	fprintf(f, ".label-col{width:80px;display:inline-block;font-weight:bold;line-height:40px}.bar{height:20px;position:absolute;top:10px}");
-	fprintf(f, ".op{background:#4CAF50}.trans{background:#2196F3}.empty{background:#FFA726;opacity:0.7}");
-	fprintf(f, ".txt{position:absolute;top:-18px;left:2px;color:#000;font-size:10px;white-space:nowrap;font-weight:bold}");
-	fprintf(f, "</style></head><body><h2>µ˜∂»∏ ÃÿÕº (Makespan: %d)</h2>", fitness);
+            // Empty leg
+            int es = empty_start[j][k], ee = empty_end[j][k];
+            if (ee > es) {
+                char buf[128];
+                if (from_loc == 0 && !is_hk)
+                    sprintf_s(buf, "Á©∫ËΩΩ‚Üí‰ªìÂ∫ì");
+                else if (from_loc == 0)
+                    sprintf_s(buf, "Á©∫ËΩΩ‚ÜíÊú∫Â∫ä%d", to_loc);
+                else
+                    sprintf_s(buf, "Á©∫ËΩΩ‚ÜíÊú∫Â∫ä%d", from_loc);
+                vehicle_tasks[v_id].push_back({ es, ee, 0, buf, "empty" });
+            }
 
-	for (auto& vt : vehicle_tasks) {
-		int v_id = vt.first;
-		auto& tasks = vt.second;
-		fprintf(f, "<div class='row'><span class='label-col'>≥µ¡æ %d</span>", v_id);
-		for (auto& t : tasks) {
-			const char* cls = (t.type == "empty") ? "empty" : "trans";
-			fprintf(f, "<div class='bar %s' style='left:%dpx;width:%dpx'><span class='txt'>%s</span></div>",
-				cls, 80 + t.start * 5, (t.end - t.start) * 5, t.label.c_str());
-		}
-		fprintf(f, "</div>");
-	}
+            // Loaded leg
+            int ts = trans_start[j][k], te = trans_end[j][k];
+            if (te > ts) {
+                char buf[128];
+                if (!is_hk) {
+                    if (from_loc == 0)
+                        sprintf_s(buf, "J%d: ‰ªìÂ∫ì‚ÜíÊú∫Â∫ä%d", j + 1, to_loc);
+                    else if (to_loc == 0)
+                        sprintf_s(buf, "J%d: Êú∫Â∫ä%d‚Üí‰ªìÂ∫ì", j + 1, from_loc);
+                    else
+                        sprintf_s(buf, "J%d: Êú∫Â∫ä%d‚ÜíÊú∫Â∫ä%d", j + 1, from_loc, to_loc);
+                }
+                else {
+                    sprintf_s(buf, "J%d: Êú∫Â∫ä%d‚ÜíÊú∫Â∫ä%d", j + 1, from_loc, to_loc);
+                }
+                vehicle_tasks[v_id].push_back({ ts, te, j + 1, buf, "load" });
+            }
 
-	for (auto& mt : machine_tasks) {
-		int m_id = mt.first;
-		auto& tasks = mt.second;
-		fprintf(f, "<div class='row'><span class='label-col'>ª˙∆˜ %d</span>", m_id);
-		for (auto& t : tasks) {
-			fprintf(f, "<div class='bar op' style='left:%dpx;width:%dpx'><span class='txt'>%s</span></div>",
-				80 + t.start * 5, (t.end - t.start) * 5, t.label.c_str());
-		}
-		fprintf(f, "</div>");
-	}
+            // Machine operation (only for production ops, k < n_ops)
+            if (k < n_ops && k < (int)op_end[j].size()) {
+                int m_id = jobs[j].gongxu_set[k].jiqi_id;
+                char buf[64];
+                sprintf_s(buf, "J%d-O%d", j + 1, k + 1);
+                machine_tasks[m_id].push_back(
+                    { op_start[j][k], op_end[j][k], j + 1, buf, "op" });
+            }
+        }
+    }
 
-	fprintf(f, "</body></html>");
-	fclose(f);
+    fprintf(f, "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        "<title>ÁîòÁâπÂõæ</title><style>");
+    fprintf(f, "body{font-family:Microsoft YaHei,Arial;margin:20px}"
+        ".row{height:40px;position:relative;border-bottom:1px solid #ddd}"
+        ".label-col{width:100px;display:inline-block;font-weight:bold;line-height:40px}"
+        ".bar{height:20px;position:absolute;top:10px}"
+        ".op{background:#4CAF50}.trans{background:#2196F3}.empty{background:#FFA726;opacity:0.7}"
+        ".txt{position:absolute;top:-18px;left:2px;color:#000;font-size:10px;"
+        "white-space:nowrap;font-weight:bold}");
+    fprintf(f, "</style></head><body><h2>Ë∞ÉÂ∫¶ÁîòÁâπÂõæ (ET: %d)</h2>", fitness);
+
+    for (auto& vt : vehicle_tasks) {
+        fprintf(f, "<div class='row'><span class='label-col'>ËΩ¶ËæÜ %d</span>", vt.first);
+        for (auto& t : vt.second) {
+            const char* cls = (t.type == "empty") ? "empty" : "trans";
+            fprintf(f, "<div class='bar %s' style='left:%dpx;width:%dpx'>"
+                "<span class='txt'>%s</span></div>",
+                cls, 100 + t.start * 5, (t.end - t.start) * 5, t.label.c_str());
+        }
+        fprintf(f, "</div>");
+    }
+
+    for (auto& mt : machine_tasks) {
+        fprintf(f, "<div class='row'><span class='label-col'>Êú∫Â∫ä %d</span>", mt.first);
+        for (auto& t : mt.second) {
+            fprintf(f, "<div class='bar op' style='left:%dpx;width:%dpx'>"
+                "<span class='txt'>%s</span></div>",
+                100 + t.start * 5, (t.end - t.start) * 5, t.label.c_str());
+        }
+        fprintf(f, "</div>");
+    }
+
+    fprintf(f, "</body></html>");
+    fclose(f);
 }

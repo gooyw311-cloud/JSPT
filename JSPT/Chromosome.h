@@ -30,10 +30,11 @@ public:
         const yunshutime& yt,
         std::vector<int>& vehicle_free,
         std::vector<int>& vehicle_pos,
-        std::vector<int>& trans_done
+        std::vector<int>& trans_done,
+		bool is_hk
     );
     void calculate(const yunshutime& yt, const std::vector<GONGJIAN>& jobs);
-	void print() const;
+	void print(const std::vector<GONGJIAN>& jobs, const yunshutime& yt) const;
     void generate_gantt(const std::vector<GONGJIAN>& jobs, const yunshutime& yt,const char* filename) const;
 
 };

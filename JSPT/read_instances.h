@@ -7,3 +7,6 @@
 void read_instances(const std::string& filename, 
                     std::vector<GONGJIAN>& machines, 
                     yunshutime& time);
+void read_instances(const std::string& filename,
+    std::vector<GONGJIAN>& machines,
+    yunshutime& time,std::string type);

@@ -65,49 +65,118 @@ void print_instances(const vector<GONGJIAN>& jobs, const yunshutime& yt)
     cout << "============================================" << endl;
 }
 
-void print_chromosome(const Chromosome& chro, const std::vector<GONGJIAN>& jobs) {
+// 位置编号 → 字符串，写入调用方提供的缓冲区，避免返回临时 std::string
+static void loc_to_str(int loc, bool is_hk, char* buf, int buf_size)
+{
+    if (loc == 0)
+        snprintf(buf, buf_size, "%s", is_hk ? "dep" : "LU");
+    else
+        snprintf(buf, buf_size, "M%d", loc);
+}
 
-    std::cout << "Layer 1 (Vehicle Assignment):" << std::endl;
-    for (size_t i = 0; i < chro.vehicle_assignment.size(); ++i) {
-        std::cout << "  Job " << (i + 1) << " Transports: ";
-        for (int v : chro.vehicle_assignment[i]) std::cout << "V" << v << " ";
-        std::cout << std::endl;
+void print_chromosome(
+    const Chromosome& chro,
+    const std::vector<GONGJIAN>& jobs,
+    const yunshutime& yt)
+{
+    bool is_hk = (yt.suanlileibei == "HK");
+
+    printf("====================================================\n");
+    printf("Instance type: %s\n", yt.suanlileibei.c_str());
+    printf("====================================================\n");
+
+    // ── Layer 1: Vehicle Assignment ───────────────────────────────────────────
+    printf("\n[Layer 1] Vehicle Assignment\n");
+    for (int i = 0; i < (int)jobs.size(); ++i)
+    {
+        int n_ops = (int)jobs[i].gongxu_set.size();
+        int n_trans = is_hk ? n_ops : n_ops + 1;
+
+        printf("  Job %d [%d slots]: ", i + 1, n_trans);
+        for (int d = 0; d < n_trans; ++d)
+        {
+            int v = (d < (int)chro.vehicle_assignment[i].size())
+                ? chro.vehicle_assignment[i][d] : -1;
+
+            int from_loc = (d == 0) ? 0 : jobs[i].gongxu_set[d - 1].jiqi_id;
+            int to_loc = (d == n_ops) ? 0 : jobs[i].gongxu_set[d].jiqi_id;
+
+            char fs[8], ts[8];
+            loc_to_str(from_loc, is_hk, fs, sizeof(fs));
+            loc_to_str(to_loc, is_hk, ts, sizeof(ts));
+            printf("%s->%s(V%d)  ", fs, ts, v);
+        }
+        printf("\n");
     }
 
-    // 辅助计数器，记录每个工件在序列中是第几次出现
-    std::map<int, int> os_counter;
-    std::map<int, int> ts_counter;
+    // ── Layer 2: Operation Sequence ───────────────────────────────────────────
+    printf("\n[Layer 2] Operation Sequence (OS)\n");
 
-    // 验证第二层 (OS) -> 对应 4 台机器
-    std::cout << "Layer 2 (OS) machine:" << std::endl;
-    std::cout << "OS sequence: [ ";
-    for (int id : chro.operation_sequence) std::cout << id << " ";
-    std::cout << "]" << std::endl;
-    
-    std::cout << "logic: ";
-    for (int id : chro.operation_sequence) {
-        int occurrence = os_counter[id]++; // 第几次出现 [cite: 3]
-        // 查找对应的工序和机器 ID
-        int m_id = jobs[id - 1].gongxu_set[occurrence].jiqi_id;
-        std::cout << "J" << id << "O" << (occurrence + 1) << "(M" << m_id << ") -> ";
+    printf("  Raw: [ ");
+    for (int id : chro.operation_sequence) printf("%d ", id);
+    printf("]\n\n");
+
+    // 列头：纯 ASCII
+    printf("  %-4s  %-8s  %-4s  %-5s  %-8s  %s\n",
+        "pos", "entry", "type", "M_id", "proc_t", "transport_slot");
+    printf("  %s\n", std::string(60, '-').c_str());
+
+    std::map<int, int> counter;
+
+    for (int pos = 0; pos < (int)chro.operation_sequence.size(); ++pos)
+    {
+        int id = chro.operation_sequence[pos];
+        int j = id - 1;
+        if (j < 0 || j >= (int)jobs.size()) continue;
+
+        int occur = counter[id]++;
+        int n_ops = (int)jobs[j].gongxu_set.size();
+
+        if (occur < n_ops)
+        {
+            // 生产工序
+            int m_id = jobs[j].gongxu_set[occur].jiqi_id;
+            int p_time = jobs[j].gongxu_set[occur].jiagong_time;
+            int v = (occur < (int)chro.vehicle_assignment[j].size())
+                ? chro.vehicle_assignment[j][occur] : -1;
+
+            int from_loc = (occur == 0) ? 0 : jobs[j].gongxu_set[occur - 1].jiqi_id;
+            char fs[8], ms[8];
+            loc_to_str(from_loc, is_hk, fs, sizeof(fs));
+            loc_to_str(m_id, is_hk, ms, sizeof(ms));
+
+            // entry 格式: J1O2
+            char entry[12];
+            snprintf(entry, sizeof(entry), "J%dO%d", id, occur + 1);
+
+            // slot 格式: slot1 fs->ms by V1
+            char slot[32];
+            snprintf(slot, sizeof(slot), "slot%d %s->%s V%d",
+                occur + 1, fs, ms, v);
+
+            printf("  %-4d  %-8s  %-4s  %-5d  %-8d  %s\n",
+                pos, entry, "proc", m_id, p_time, slot);
+        }
+        else
+        {
+            // BU/SWV 返回 LU
+            int v = (occur < (int)chro.vehicle_assignment[j].size())
+                ? chro.vehicle_assignment[j][occur] : -1;
+            int last_m = jobs[j].gongxu_set[n_ops - 1].jiqi_id;
+
+            char entry[12];
+            snprintf(entry, sizeof(entry), "J%d-ret", id);
+
+            char slot[32];
+            snprintf(slot, sizeof(slot), "slot%d M%d->LU V%d",
+                occur + 1, last_m, v);
+
+            printf("  %-4d  %-8s  %-4s  %-5s  %-8s  %s\n",
+                pos, entry, "ret", "-", "-", slot);
+        }
     }
-    std::cout << "END" << std::endl;
 
-    // 验证第三层 (TS) -> 对应 2 辆车
-    std::cout << "\nLayer 3 (TS) vehicle:" << std::endl;
-    std::cout << ": [ ";
-    for (int id : chro.transport_sequence) std::cout << id << " ";
-    std::cout << "]" << std::endl;
-
-    std::cout << "logic: ";
-    for (int id : chro.transport_sequence) {
-        int occurrence = ts_counter[id]++; // 第几次出现 
-        // 从第一层获取分配给该次运输的车辆 ID
-        int v_id = chro.vehicle_assignment[id - 1][occurrence];
-        std::cout << "J" << id << "T" << (occurrence + 1) << "(V" << v_id << ") -> ";
-    }
-    std::cout << "END" << std::endl;
-    std::cout << "====================================================" << std::endl;
+    printf("====================================================\n");
 }
 int main()
 {
@@ -125,7 +194,7 @@ int main()
     read_instances(
         "HK1.txt",
         jobs2,
-        yt2
+		yt2, "HK"
     );
     print_instances(jobs2, yt2);
 
@@ -143,20 +212,21 @@ int main()
     int num_agvsSWV = 5;
     
    // 调用函数生成初始染色体
-    Chromosome test_chro = generate_random_chromosome(jobs1, num_agvsBU);
-    print_chromosome(test_chro, jobs1);
+    Chromosome test_chro = generate_random_chromosome(jobs1, num_agvsBU,yt1);
+    print_chromosome(test_chro, jobs1,yt1);
 	test_chro.calculate(yt1, jobs1); // 计算适应度
-	test_chro.print(); // 打印染色体信息
+	test_chro.print(jobs1, yt1); // 打印染色体信息
 	test_chro.generate_gantt(jobs1,yt1, "gantt_chart.txt"); // 生成甘特图
 	cout << "tiaoshi" << endl;
-    Chromosome test_chro2 = generate_random_chromosome(jobs2, num_agvsHK);
-    print_chromosome(test_chro2, jobs2);
+    Chromosome test_chro2 = generate_random_chromosome(jobs2, num_agvsHK,yt2);
+    //print_chromosome(test_chro2, jobs2,yt2);
 	test_chro2.calculate(yt2, jobs2); // 计算适应度
-	test_chro2.print(); // 打印染色体信息
-    Chromosome test_chro3 = generate_random_chromosome(jobs3, num_agvsSWV);
-    print_chromosome(test_chro3, jobs3);
+	test_chro2.print(jobs2, yt2); // 打印染色体信息
+	test_chro2.generate_gantt(jobs2, yt2, "gantt_chart_hk.txt"); // 生成甘特图
+    Chromosome test_chro3 = generate_random_chromosome(jobs3, num_agvsSWV,yt3);
+    //print_chromosome(test_chro3, jobs3,yt3);
 	test_chro3.calculate(yt3, jobs3); // 计算适应度
-	test_chro3.print(); // 打印染色体信息
-
+	test_chro3.print(jobs2, yt2); // 打印染色体信息
+	test_chro3.generate_gantt(jobs3, yt3, "gantt_chart_swv.txt"); // 生成甘特图
     return 0;
 }
