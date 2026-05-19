@@ -112,7 +112,19 @@ void Chromosome::schedule_transport(
 
     // --- Empty travel: vehicle repositions to pickup ---
     int t_empty_start = vehicle_free[v_id];
-    int t_vehicle_arrive = t_empty_start + yt.kong[vehicle_pos[v_id]][from_loc];
+    int t_vehicle_arrive;
+    if (is_hk && d == 0)
+    {
+        // HK first transport: job is already at machine[0], so there is no
+        // loaded move.  The vehicle drives empty from its current location
+        // directly to the first machine (not through the virtual depot, which
+        // would cost 0 and lose the real repositioning time).
+        t_vehicle_arrive = t_empty_start + yt.kong[vehicle_pos[v_id]][to_loc];
+    }
+    else
+    {
+        t_vehicle_arrive = t_empty_start + yt.kong[vehicle_pos[v_id]][from_loc];
+    }
 
     // --- Loaded travel: vehicle carries job to next location ---
     int loaded_time;
@@ -216,16 +228,35 @@ void Chromosome::calculate(
         {
             // ---- Production operation d ----
             // 1. Schedule the transport that brings job to this machine
-            schedule_transport(id, d, jobs, yt,
-                vehicle_free, vehicle_pos, trans_done, is_hk);
+            int from_loc = (d == 0) ? 0 : jobs[j].gongxu_set[d - 1].jiqi_id;
+            int to_loc   = jobs[j].gongxu_set[d].jiqi_id;
+
+            if (d > 0 && from_loc == to_loc)
+            {
+                // Consecutive ops on the same machine — no transport needed.
+                // Record zero-duration transport at the previous op end time
+                // so the vehicle is not occupied.
+                int t_ready = op_end[j][d - 1];
+                empty_start[j][d] = t_ready;
+                empty_end[j][d]   = t_ready;
+                trans_start[j][d] = t_ready;
+                trans_end[j][d]   = t_ready;
+            }
+            else
+            {
+                schedule_transport(id, d, jobs, yt,
+                    vehicle_free, vehicle_pos, trans_done, is_hk);
+            }
 
             // 2. Schedule the machining operation
             int machine_id = jobs[j].gongxu_set[d].jiqi_id;
             int process_time = jobs[j].gongxu_set[d].jiagong_time;
             if (machine_id < 0 || machine_id >= num_locs) continue;
 
+            // HK first op: job starts on its first machine, no vehicle wait
+            int transport_arrival = (d == 0 && is_hk) ? 0 : trans_end[j][d];
             int t_start = std::max({
-                trans_end[j][d],
+                transport_arrival,
                 (d == 0 ? 0 : op_end[j][d - 1]),
                 machine_free[machine_id]
                 });

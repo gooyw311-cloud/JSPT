@@ -136,6 +136,15 @@ void read_instances(
         yt.man_hk[i].resize(n_ops, 0);
         for (int d = 0; d < n_ops; d++)
             fin >> yt.man_hk[i][d];
+
+        // HK data files store n_ops+1 values per row; the extra is
+        // return-to-depot time (unused in HK).  Skip it to prevent
+        // parsing drift into the next row.
+        {
+            int dummy;
+            fin >> dummy;
+        }
+
         // Sanity check: first value should be 0 per HK definition
         if (yt.man_hk[i][0] != 0)
         {

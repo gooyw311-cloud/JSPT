@@ -11,7 +11,8 @@
                 "/Fe:program.exe",
                 "JSPT/源.cpp",
                 "JSPT/read_instances.cpp",
-                "JSPT/random.cpp"
+                "JSPT/random.cpp",
+                "JSPT/Chromosome.cpp"
             ],
             "group": {
                 "kind": "build",
