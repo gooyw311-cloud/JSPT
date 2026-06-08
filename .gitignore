@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# 项目测试生成文件
+gantt_chart*.html
+gantt_chart*.txt
+output.txt
+*.bak

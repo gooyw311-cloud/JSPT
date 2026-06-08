@@ -5,6 +5,7 @@
 #include "yunshutime.h"
 #include "read_instances.h"
 #include "random.h"
+#include "critical_path.h"
 #include <map>
 
 using namespace std;
@@ -216,17 +217,29 @@ int main()
     print_chromosome(test_chro, jobs1,yt1);
 	test_chro.calculate(yt1, jobs1); // 计算适应度
 	test_chro.print(jobs1, yt1); // 打印染色体信息
-	test_chro.generate_gantt(jobs1,yt1, "gantt_chart.txt"); // 生成甘特图
+	{
+		CriticalPathResult cp1 = findCriticalPath(test_chro, jobs1, yt1);
+		printCriticalPathTrace(cp1);
+		generateGanttWithCriticalPath(test_chro, jobs1, yt1, "gantt_chart.html", cp1);
+	}
 	cout << "tiaoshi" << endl;
     Chromosome test_chro2 = generate_random_chromosome(jobs2, num_agvsHK,yt2);
     //print_chromosome(test_chro2, jobs2,yt2);
 	test_chro2.calculate(yt2, jobs2); // 计算适应度
 	test_chro2.print(jobs2, yt2); // 打印染色体信息
-	test_chro2.generate_gantt(jobs2, yt2, "gantt_chart_hk.txt"); // 生成甘特图
+	{
+		CriticalPathResult cp2 = findCriticalPath(test_chro2, jobs2, yt2);
+		printCriticalPathTrace(cp2);
+		generateGanttWithCriticalPath(test_chro2, jobs2, yt2, "gantt_chart_hk.html", cp2);
+	}
     Chromosome test_chro3 = generate_random_chromosome(jobs3, num_agvsSWV,yt3);
     //print_chromosome(test_chro3, jobs3,yt3);
 	test_chro3.calculate(yt3, jobs3); // 计算适应度
 	test_chro3.print(jobs2, yt2); // 打印染色体信息
-	test_chro3.generate_gantt(jobs3, yt3, "gantt_chart_swv.txt"); // 生成甘特图
+	{
+		CriticalPathResult cp3 = findCriticalPath(test_chro3, jobs3, yt3);
+		printCriticalPathTrace(cp3);
+		generateGanttWithCriticalPath(test_chro3, jobs3, yt3, "gantt_chart_swv.html", cp3);
+	}
     return 0;
 }
