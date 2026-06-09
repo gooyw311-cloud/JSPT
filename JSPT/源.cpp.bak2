@@ -191,7 +191,7 @@ int main()
         yt1
     );
     print_instances(jobs1, yt1);
-
+    
 
     read_instances(
         "HK1.txt",
@@ -200,7 +200,7 @@ int main()
     );
     print_instances(jobs2, yt2);
 
-
+    
     read_instances(
         "SWV1.txt",
         jobs3,
@@ -212,7 +212,7 @@ int main()
     int num_agvsBU = 2;
     int num_agvsHK = 1;
     int num_agvsSWV = 5;
-
+    
    // 调用函数生成初始染色体
     Chromosome test_chro = generate_random_chromosome(jobs1, num_agvsBU,yt1);
     print_chromosome(test_chro, jobs1,yt1);
@@ -242,40 +242,5 @@ int main()
 		printCriticalPathTrace(cp3);
 		generateGanttWithCriticalPath(test_chro3, jobs3, yt3, "gantt_chart_swv.html", cp3);
 	}
-
-    // ============================================================
-    //  N8 邻域详查 — 逐块逐 move 验证 N8 规则
-    // ============================================================
-    printf("\n========== N8 邻域详查 ==========\n");
-
-    // --- EX101 (BU/SWV) ---
-    {
-        printf("\n******** EX101 (BU/SWV) ********\n");
-        Chromosome chro = generate_random_chromosome(jobs1, num_agvsBU, yt1);
-        chro.calculate(yt1, jobs1);
-        CriticalPathResult cp = findCriticalPath(chro, jobs1, yt1);
-        verifyN8Detailed(chro, cp, jobs1, yt1);
-    }
-
-    // --- HK1 ---
-    {
-        printf("\n******** HK1 ********\n");
-        Chromosome chro = generate_random_chromosome(jobs2, num_agvsHK, yt2);
-        chro.calculate(yt2, jobs2);
-        CriticalPathResult cp = findCriticalPath(chro, jobs2, yt2);
-        verifyN8Detailed(chro, cp, jobs2, yt2);
-    }
-
-    // --- SWV1 ---
-    {
-        printf("\n******** SWV1 ********\n");
-        Chromosome chro = generate_random_chromosome(jobs3, num_agvsSWV, yt3);
-        chro.calculate(yt3, jobs3);
-        CriticalPathResult cp = findCriticalPath(chro, jobs3, yt3);
-        verifyN8Detailed(chro, cp, jobs3, yt3);
-    }
-
-    printf("\n========== N8 邻域详查完成 ==========\n");
-
     return 0;
 }

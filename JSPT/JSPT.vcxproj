@@ -127,6 +127,7 @@
   <ItemGroup>
     <ClCompile Include="Chromosome.cpp" />
     <ClCompile Include="critical_path.cpp" />
+    <ClCompile Include="neighborhood.cpp" />
     <ClCompile Include="random.cpp" />
     <ClCompile Include="read_instances.cpp" />
     <ClCompile Include="源.cpp" />
@@ -135,6 +136,7 @@
     <ClInclude Include="Chromosome.h" />
     <ClInclude Include="critical_path.h" />
     <ClInclude Include="GONGJIAN.h" />
+    <ClInclude Include="neighborhood.h" />
     <ClInclude Include="GONGXU.h" />
     <ClInclude Include="random.h" />
     <ClInclude Include="read_instances.h" />

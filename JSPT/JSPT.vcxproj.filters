@@ -30,6 +30,9 @@
     <ClCompile Include="critical_path.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="neighborhood.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GONGXU.h">
@@ -48,6 +51,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="critical_path.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="neighborhood.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="random.h">
